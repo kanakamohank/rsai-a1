@@ -76,8 +76,8 @@ def compute_fooling_rate(model: nn.Module,
             orig_preds = orig_outputs.argmax(dim=1)
 
             # Perturbed predictions
-            # Add perturbation and clamp to valid range
-            pert_images = torch.clamp(images + perturbation, 0, 1)
+            # Note: Do not clamp normalized CIFAR images to [0,1] as they have values outside this range
+            pert_images = images + perturbation
             pert_outputs = model(pert_images)
             pert_preds = pert_outputs.argmax(dim=1)
 
@@ -162,7 +162,8 @@ def compute_uap(model: nn.Module,
             label = label.to(device)
 
             # Apply current universal perturbation
-            pert_image = torch.clamp(image + v, 0, 1)
+            # Note: Do not clamp normalized CIFAR images to [0,1] as they have values outside this range
+            pert_image = image + v
 
             # Check if image is already fooled
             with torch.no_grad():
@@ -175,28 +176,56 @@ def compute_uap(model: nn.Module,
             # If not fooled, compute perturbation with DeepFool
             if orig_pred == pert_pred:
                 # Apply DeepFool to the perturbed image
-                dr, num_iter, _, final_label = deepfool(
-                    pert_image.squeeze(0),
-                    model,
-                    num_classes=num_classes,
-                    overshoot=overshoot,
-                    max_iter=max_iter_df
-                )
+                # pert_image is (1, C, H, W), squeeze to (C, H, W) for DeepFool
+                pert_input = pert_image.squeeze(0)
 
-                # Check if DeepFool succeeded
-                if final_label != pert_pred:
-                    # Update universal perturbation
-                    v = v + dr.to(device)
+                try:
+                    dr, num_iter, _, final_label = deepfool(
+                        pert_input,
+                        model,
+                        num_classes=num_classes,
+                        overshoot=overshoot,
+                        max_iter=max_iter_df
+                    )
 
-                    # Project to constraint set
-                    v = project_perturbation(v, xi, norm_type)
+                    # Validate DeepFool output
+                    if (dr is not None and
+                        torch.is_tensor(dr) and
+                        dr.numel() > 0 and
+                        torch.norm(dr.flatten()) > 1e-8):
 
-                    # Re-check if now fooled
-                    with torch.no_grad():
-                        new_pert_image = torch.clamp(image + v, 0, 1)
-                        new_pred = model(new_pert_image).argmax(dim=1).item()
-                        if new_pred != orig_pred:
-                            fooled_count += 1
+                        # Ensure dr has the correct shape and device
+                        dr = dr.to(device)
+                        if dr.shape != v.shape:
+                            print(f"Warning: Shape mismatch - dr: {dr.shape}, v: {v.shape}")
+                            continue
+
+                        # Check if DeepFool actually fooled the image
+                        if final_label != pert_pred:
+                            # Update universal perturbation
+                            old_v_norm = torch.norm(v.flatten(), p=2).item()
+                            v = v + dr
+
+                            # Project to constraint set
+                            v = project_perturbation(v, xi, norm_type)
+                            new_v_norm = torch.norm(v.flatten(), p=2).item()
+
+                            print(f"  Updated UAP: {old_v_norm:.6f} -> {new_v_norm:.6f}")
+
+                            # Re-check if now fooled
+                            with torch.no_grad():
+                                new_pert_image = image + v
+                                new_pred = model(new_pert_image).argmax(dim=1).item()
+                                if new_pred != orig_pred:
+                                    fooled_count += 1
+                        else:
+                            print(f"  DeepFool failed to fool image")
+                    else:
+                        print(f"  DeepFool returned invalid perturbation")
+
+                except Exception as e:
+                    print(f"  DeepFool error: {e}")
+                    continue
             else:
                 fooled_count += 1
 
