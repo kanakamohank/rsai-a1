@@ -54,17 +54,30 @@ def load_cifar100_model(model_name: str, checkpoint_path: Optional[str] = None,
     Returns:
         Loaded model in eval mode
     """
-    # Check if it's a torch.hub model (starts with 'cifar')
-    if model_name.startswith('cifar100_') or model_name.startswith('cifar10_'):
+    # List of known torch.hub CIFAR models
+    torch_hub_models = [
+        'cifar100_resnet20', 'cifar100_resnet32', 'cifar100_resnet44', 'cifar100_resnet56',
+        'cifar100_vgg11_bn', 'cifar100_vgg13_bn', 'cifar100_vgg16_bn', 'cifar100_vgg19_bn',
+        'cifar100_repvgg_a0', 'cifar100_repvgg_a1', 'cifar100_repvgg_a2',
+        'cifar10_resnet20', 'cifar10_resnet32', 'cifar10_resnet44', 'cifar10_resnet56',
+        'cifar10_vgg11_bn', 'cifar10_vgg13_bn', 'cifar10_vgg16_bn', 'cifar10_vgg19_bn'
+    ]
+
+    # Check if it's a torch.hub model
+    if model_name in torch_hub_models or model_name.startswith('cifar'):
         # Load from torch.hub
         print(f"Loading torch.hub model: {model_name}")
-        model = torch.hub.load(
-            "chenyaofo/pytorch-cifar-models",
-            model_name,
-            pretrained=False,  # We'll load our saved checkpoint
-            trust_repo=True,
-            verbose=False
-        )
+        try:
+            model = torch.hub.load(
+                "chenyaofo/pytorch-cifar-models",
+                model_name,
+                pretrained=False,  # We'll load our saved checkpoint
+                trust_repo=True,
+                verbose=False
+            )
+        except Exception as e:
+            print(f"Error loading {model_name} from torch.hub: {e}")
+            raise ValueError(f"Failed to load torch.hub model: {model_name}")
 
         if checkpoint_path is not None:
             try:
@@ -84,7 +97,39 @@ def load_cifar100_model(model_name: str, checkpoint_path: Optional[str] = None,
                 print(f"✓ Loaded weights from {checkpoint_path}")
             except FileNotFoundError:
                 print(f"⚠ Checkpoint not found: {checkpoint_path}")
-                print("  Using randomly initialized model")
+                print("  Loading pretrained weights from torch.hub instead...")
+                # Load pretrained model directly
+                model = torch.hub.load(
+                    "chenyaofo/pytorch-cifar-models",
+                    model_name,
+                    pretrained=True,
+                    trust_repo=True,
+                    verbose=False
+                )
+                print(f"✓ Loaded pretrained {model_name} from torch.hub")
+            except Exception as e:
+                print(f"Error loading checkpoint: {e}")
+                print("  Loading pretrained weights from torch.hub instead...")
+                # Load pretrained model directly
+                model = torch.hub.load(
+                    "chenyaofo/pytorch-cifar-models",
+                    model_name,
+                    pretrained=True,
+                    trust_repo=True,
+                    verbose=False
+                )
+                print(f"✓ Loaded pretrained {model_name} from torch.hub")
+        else:
+            # No checkpoint provided, load pretrained
+            print("  No checkpoint provided, loading pretrained weights from torch.hub...")
+            model = torch.hub.load(
+                "chenyaofo/pytorch-cifar-models",
+                model_name,
+                pretrained=True,
+                trust_repo=True,
+                verbose=False
+            )
+            print(f"✓ Loaded pretrained {model_name} from torch.hub")
     else:
         # Use custom get_model() for standard architectures
         model = get_model(model_name, num_classes=100, pretrained=False)
