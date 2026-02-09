@@ -22,20 +22,20 @@ NUM_CHANNELS = 3
 CIFAR100_MEAN = [0.5071, 0.4867, 0.4408]
 CIFAR100_STD = [0.2675, 0.2565, 0.2761]
 
-# Model configuration - Using pretrained models for better performance
-MODEL_NAME = 'cifar100_resnet20'  # Pre-trained from torch.hub (68.83% accuracy)
-MODEL_PATH = 'checkpoints/cifar100_resnet20.pth'
+# Model configuration - Using deeper pretrained models for better performance
+MODEL_NAME = 'cifar100_resnet32'  # Upgraded from ResNet-20 (70.14% accuracy)
+MODEL_PATH = 'checkpoints/cifar100_resnet32.pth'
 
 # Alternative models for transferability testing
-MODEL_NAME_TRANSFER = 'cifar100_vgg16_bn'
-MODEL_PATH_TRANSFER = 'checkpoints/cifar100_vgg16_bn.pth'
+MODEL_NAME_TRANSFER = 'cifar100_vgg19_bn'  # Upgraded from VGG-16 (73.85% accuracy)
+MODEL_PATH_TRANSFER = 'checkpoints/cifar100_vgg19_bn.pth'
 
-# UAP configuration - Optimized for pretrained models
+# UAP configuration - Enhanced for better correlation and transferability
 UAP_CONFIG = {
-    'subset_size': 500,         # Reduced for faster computation with pretrained models
-    'xi': 40/255,               # Perturbation magnitude (L∞)
-    'delta': 0.7,               # Target fooling rate (70% for faster convergence)
-    'max_iter_uni': 2,          # Maximum UAP iterations
+    'subset_size': 700,         # Increased for better gradient statistics
+    'xi': 20/255,               # Reduced perturbation for better transferability
+    'delta': 0.65,              # Slightly lower target to allow more iterations
+    'max_iter_uni': 3,          # More iterations for better convergence
     'norm_type': 'inf',         # 'inf' or 2
     'save_interval': 1,         # Save checkpoint every N iterations
 }
@@ -58,11 +58,11 @@ PGD_CONFIG = {
     'num_iter': 10,             # Number of iterations
 }
 
-# Analysis configuration
+# Analysis configuration - Enhanced for better statistics
 ANALYSIS_CONFIG = {
-    'num_gradient_samples': 100,    # For correlation analysis
-    'num_pca_samples': 500,          # For dimensionality analysis
-    'num_transfer_samples': 1000,   # For transferability testing
+    'num_gradient_samples': 200,    # Doubled for better correlation estimation
+    'num_pca_samples': 800,         # Increased for better dimensionality analysis
+    'num_transfer_samples': 1500,   # More samples for robust transferability testing
 }
 
 # Paths
